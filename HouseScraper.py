@@ -138,5 +138,5 @@ async def main():
    # Print the combined properties as an array of objects
    print(all_properties)
 
-if __name__ == '__main__':
-   asyncio.run(main())
+# if __name__ == '__main__':
+#    asyncio.run(main())
