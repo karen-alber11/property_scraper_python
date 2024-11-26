@@ -8,17 +8,15 @@ from HouseScraper import HouseScraping
 app = Quart(__name__)
 
 # Configure logging to display debug and error messages
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 @app.route('/')
 async def index():
     try:
-        # Initialize the scraper with the URLs
         house_scraper_1 = HouseScraping("https://www.q84sale.com/en/property/for-sale/house-for-sale/1")
         house_scraper_2 = HouseScraping("https://www.q84sale.com/en/property/for-sale/house-for-sale/2")
         house_scraper_3 = HouseScraping("https://www.q84sale.com/en/property/for-sale/house-for-sale/3")
 
-        # Log before running the async functions
         app.logger.info("Starting property scraping...")
 
         # Run the async functions to get property details
@@ -26,18 +24,12 @@ async def index():
         properties_2 = await house_scraper_2.get_property_details()
         properties_3 = await house_scraper_3.get_property_details()
 
-        # Combine the results from all scrapers into a single array of objects
         all_properties = properties_1 + properties_2 + properties_3
-
-        # Log the success
         app.logger.info(f"Scraped {len(all_properties)} properties.")
-
-        # Return the combined properties as a JSON response
         return jsonify(all_properties)
 
     except Exception as e:
-        # Log the error and return a 500 response
-        app.logger.error(f"Error occurred: {str(e)}")
+        app.logger.error(f"Error occurred: {e}", exc_info=True)
         return jsonify({"error": "Internal Server Error"}), 500
 
 # Run the app
