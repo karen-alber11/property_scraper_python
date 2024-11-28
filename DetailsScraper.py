@@ -374,4 +374,3 @@ class DetailsScraping:
 #     # Print the extracted details
 #     for property in properties:
 #         print(property)
-
