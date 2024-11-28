@@ -39,12 +39,13 @@ class DetailsScraping:
                         title = await self.scrape_title(card)
                         description = await self.scrape_description(card)
                         pinned_today = await self.scrape_pinned_today(card)
+                        id = await self.scrape_id(link)
 
                         # Scrape additional details from the property page
                         additional_details = await self.scrape_additional_details(link)
 
                         properties.append({
-                            'id': additional_details.get('id'),
+                            'id': id,
                             'date_published': additional_details.get('date_published'),
                             'relative_date': additional_details.get('relative_date'),
                             'pin': pinned_today,
@@ -195,14 +196,15 @@ class DetailsScraping:
             print(f"Error while scraping views number: {e}")
             return None
 
-    async def scrape_id(self, page):
+    async def scrape_id(self, link):
         try:
-            title_content = await page.title()
-            match = re.search(r"No:(\d+)", title_content)
+            # Match the ID from the URL (last part of the URL after the last hyphen)
+            match = re.search(r'-(\d+)$', link)
             return match.group(1) if match else None
         except Exception as e:
-            print(f"Error while scraping id number: {e}")
+            print(f"Error while scraping id from link: {e}")
             return None
+
     async def scrape_image(self, page):
         try:
             image_selector = '.styles_img__PC9G3'
@@ -216,25 +218,31 @@ class DetailsScraping:
     async def scrape_price(self, page):
         price_selector = '.h3.m-h5.text-prim_4sale_500'
         price = await page.query_selector(price_selector)
-        return await price.inner_text() if price else None
+        return await price.inner_text() if price else "0 KWD"
 
     # New method to scrape the address
     async def scrape_address(self, page):
         address_selector = '.text-4-regular.m-text-5-med.text-neutral_600'
         address = await page.query_selector(address_selector)
-        return await address.inner_text() if address else None
+        if address:
+            text = await address.inner_text()
+            # Check if the text matches the format "Ad ID: <any number>"
+            if re.match(r'^Ad ID: \d+$', text):
+                return "Not Mentioned"
+            return text
+        return "Not Mentioned"
 
     # New method to scrape the number of beds
     async def scrape_beds(self, page):
         beds_selector = '.d-flex.align-items-center.bg-neutral_50.styles_attr__BN3w_ img[alt="Rooms"] + div.text-4-med.m-text-5-med.text-neutral_900'
         beds = await page.query_selector(beds_selector)
-        return await beds.inner_text() if beds else None
+        return await beds.inner_text() if beds else "0 Bed"
 
     # New method to scrape the area
     async def scrape_area(self, page):
         area_selector = '.d-flex.align-items-center.bg-neutral_50.styles_attr__BN3w_ img[alt="Property Area"] + div.text-4-med.m-text-5-med.text-neutral_900'
         area = await page.query_selector(area_selector)
-        return await area.inner_text() if area else None
+        return await area.inner_text() if area else "0 m2"
 
     # New method to scrape the phone number
     async def scrape_phone_number(self, page):
@@ -279,8 +287,27 @@ class DetailsScraping:
 
             details_selector = '.styles_memberDate__qdUsm span.text-neutral_600'
             detail_elements = await second_div.query_selector_all(details_selector)
-            ads = await detail_elements[0].inner_text() if len(detail_elements) > 0 else None
-            membership = await detail_elements[1].inner_text() if len(detail_elements) > 1 else None
+
+            # Extract ads with validation
+            if len(detail_elements) > 0:
+                ads_text = await detail_elements[0].inner_text()
+                ads = ads_text if re.match(r'^\d+\s+ads$', ads_text, re.IGNORECASE) else "0 ads"
+            else:
+                ads = "0 ads"
+
+            # Extract membership with fallback
+            membership = None
+            if len(detail_elements) > 1:
+                membership_text = await detail_elements[1].inner_text()
+                if re.match(r'^Member since .+$', membership_text, re.IGNORECASE):
+                    membership = membership_text
+                else:
+                    # Fallback to the first element if membership is null or does not match
+                    membership = await detail_elements[0].inner_text()
+            elif len(detail_elements) > 0:
+                # Fallback to the first element if no second element exists
+                membership = await detail_elements[0].inner_text()
+
             return {
                 'submitter': submitter,
                 'ads': ads,
@@ -300,8 +327,6 @@ class DetailsScraping:
                 await page.wait_for_selector('.StackedCard_card__Kvggc', timeout=300000)
 
                 # Extract details using helper methods
-                id = await self.scrape_id(page)
-                relative_date = await self.scrape_relative_date(page)
                 image = await self.scrape_image(page)
                 price = await self.scrape_price(page)
                 address = await self.scrape_address(page)
@@ -321,7 +346,6 @@ class DetailsScraping:
                     'address': address,
                     'beds': beds,
                     'area': area,
-                    'id': id,
                     'views_no': views_no,
                     'submitter': submitter_details.get('submitter'),
                     'ads': submitter_details.get('ads'),
@@ -339,15 +363,15 @@ class DetailsScraping:
             return {}
 
 
-# Correctly run the async function with an instance of the class
-if __name__ == "__main__":
-    # Initialize the scraper with the main page URL
-    scraper = DetailsScraping("https://www.q84sale.com/en/property/for-sale/house-for-sale/1")
-
-    # Use asyncio.run to execute the async function
-    properties = asyncio.run(scraper.get_property_details())
-
-    # Print the extracted details
-    for property in properties:
-        print(property)
+# # Correctly run the async function with an instance of the class
+# if __name__ == "__main__":
+#     # Initialize the scraper with the main page URL
+#     scraper = DetailsScraping("https://www.q84sale.com/en/property/for-sale/house-for-sale/1")
+#
+#     # Use asyncio.run to execute the async function
+#     properties = asyncio.run(scraper.get_property_details())
+#
+#     # Print the extracted details
+#     for property in properties:
+#         print(property)
 
